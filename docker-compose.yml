@@ -1,0 +1,10 @@
+services:
+  jtrial:
+    build:
+      context: ${BUILD_CONTEXT}
+      dockerfile: ${BUILD_CONTEXT}/dNodeJ/dockerfiles/r2julia-file
+      args:
+        REL_SCRIBE_LOC: ${REL_SCRIBE_LOC}
+        REL_DNODEJ_LOC: ${REL_DNODEJ_LOC}
+    container_name: jtrial
+    command: bash

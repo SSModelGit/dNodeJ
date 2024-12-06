@@ -1,9 +1,12 @@
 FROM julia:1.10
 
+ARG REL_SCRIBE_LOC
+ARG REL_DNODEJ_LOC
+
 WORKDIR /app
 
-COPY ../SCRIBE /app/SCRIBE
-COPY dNodeArch /app/dNodeArch
+COPY ${REL_SCRIBE_LOC} /app/SCRIBE
+COPY ${REL_DNODEJ_LOC}/dNodeArch /app/dNodeArch
 
 RUN julia -e 'using Pkg; Pkg.develop(path="/app/SCRIBE"); Pkg.develop(path="/app/dNodeArch"); Pkg.instantiate();'
 
