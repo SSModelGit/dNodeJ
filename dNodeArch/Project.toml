@@ -1,7 +1,10 @@
-name = "R2NodeJ"
+name = "dNodeArch"
 uuid = "a9b4fbfd-eefb-41e3-9fe8-cbfbf4f759c4"
 authors = ["Shashank Swaminathan"]
 version = "1.0.0-DEV"
+
+[deps]
+SCRIBE = "9d033a4c-5281-4799-847b-6fce4a2de302"
 
 [compat]
 julia = "1"

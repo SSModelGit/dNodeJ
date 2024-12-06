@@ -1,4 +1,4 @@
-module R2NodeJ
+module dNodeArch
 
 # Write your package code here.
 

@@ -1,0 +1,10 @@
+FROM julia:1.10
+
+WORKDIR /app
+
+COPY ../SCRIBE /app/SCRIBE
+COPY dNodeArch /app/dNodeArch
+
+RUN julia -e 'using Pkg; Pkg.develop(path="/app/SCRIBE"); Pkg.develop(path="/app/dNodeArch"); Pkg.instantiate();'
+
+ENTRYPOINT [ "julia", "/app/SCRIBE/test/test_kalman.jl" ]
