@@ -1,0 +1,13 @@
+FROM julia:1.10
+
+ARG REL_SCRIBE_LOC
+ARG REL_DNODEJ_LOC
+
+WORKDIR /app
+
+COPY ${REL_SCRIBE_LOC} /app/SCRIBE
+COPY ${REL_DNODEJ_LOC} /app/dNodeArch
+
+RUN julia -e 'using Pkg; Pkg.develop(path="/app/SCRIBE"); Pkg.develop(path="/app/dNodeArch"); Pkg.instantiate();'
+
+ENTRYPOINT [ "julia", "/app/SCRIBE/test/test_kalman.jl" ]

@@ -1,13 +1,123 @@
-FROM julia:1.10
+# ROS distribution to use
+ARG ROS_DISTRO=humble
 
-ARG REL_SCRIBE_LOC
-ARG REL_DNODEJ_LOC
+FROM ros:${ROS_DISTRO} AS r2base
 
-WORKDIR /app
+ARG REL_DNODEJ_LOC=dNodeArch
 
-COPY ${REL_SCRIBE_LOC} /app/SCRIBE
-COPY ${REL_DNODEJ_LOC}/dNodeArch /app/dNodeArch
+ENV ROS_DISTRO=${ROS_DISTRO}
+SHELL ["/bin/bash", "-c"]
 
-RUN julia -e 'using Pkg; Pkg.develop(path="/app/SCRIBE"); Pkg.develop(path="/app/dNodeArch"); Pkg.instantiate();'
+RUN apt update && DEBIAN_FRONTEND=noninteractive && \
+    apt install -yqq --no-install-recommends \
+    curl lsb-release git
 
-ENTRYPOINT [ "julia", "/app/SCRIBE/test/test_kalman.jl" ]
+###########################################################################################
+## COMMENT THE FOLLOWING SECTION OUT IF NOT USING ROS OR OTHER VISUALIZERS
+###########################################################################################
+
+# RUN apt-get install -yqq --no-install-recommends ros-${ROS_DISTRO}-rqt*
+
+###########################################################################################
+## (ADDITIONALLY) COMMENT THIS OUT IF YOU ARE NOT USING PROPRIETARY NVIDIA DRIVERS!!!
+###########################################################################################
+# RUN apt-get update \
+#   && apt-get install -y -qq --no-install-recommends \
+#     libglvnd0 \
+#     libgl1 \
+#     libglx0 \
+#     libegl1 \
+#     libxext6 \
+#     libx11-6 \
+#   && rm -rf /var/lib/apt/lists/*# Env vars for the nvidia-container-runtime.
+# ENV NVIDIA_VISIBLE_DEVICES all
+# ENV NVIDIA_DRIVER_CAPABILITIES graphics,utility,compute
+###########################################################################################
+
+# Remove display warnings
+# RUN mkdir /tmp/runtime-root
+# ENV XDG_RUNTIME_DIR "/tmp/runtime-root"
+# RUN chmod -R 0700 /tmp/runtime-root
+# ENV NO_AT_BRIDGE 1
+
+## END OF VISUALIZATION-FOCUSED ADDITIONS
+###########################################################################################
+
+WORKDIR /dnode
+
+COPY ${REL_DNODEJ_LOC}/docker/r2_entrypoint.sh /
+ENTRYPOINT [ "/r2_entrypoint.sh" ]
+
+#########################################################
+# Overlay Image for ROS2-based Distributed Architecture #
+#########################################################
+
+FROM r2base AS r2overlay
+
+ARG REL_DNODEJ_LOC=dNodeArch
+ARG REL_SCRIBE_LOC=SCRIBE
+
+ARG USERNAME=devuser
+ARG UID=1000
+ARG GID=${UID}
+
+RUN mkdir -p /dnode/src
+WORKDIR /dnode
+
+# Copy core files
+COPY ${REL_DNODEJ_LOC}/docker/r2_entrypoint.sh /
+COPY ${REL_SCRIBE_LOC} ./src/SCRIBE
+COPY ${REL_DNODEJ_LOC} ./src/dNodeArch
+
+# Update environment variables for convenience
+ENV REL_SCRIBE_LOC=${REL_SCRIBE_LOC}
+ENV REL_DNODEJ_LOC=${REL_DNODEJ_LOC}
+
+# Build ROS2 architecture
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
+    && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
+    && colcon build --symlink-install
+
+# Because Juliaup is annoyingly single-user, we will first create a user
+ # Create new user and home directory (this will be used in the dev layer as well)
+ RUN groupadd --gid $GID $USERNAME \
+ && useradd --uid ${GID} --gid ${UID} --create-home ${USERNAME} \
+ && echo ${USERNAME} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USERNAME} \
+ && chmod 0440 /etc/sudoers.d/${USERNAME} \
+ && mkdir -p /home/${USERNAME} \
+ && chown -R ${UID}:${GID} /home/${USERNAME}
+
+# Set the ownership of the overlay workspace to the new user
+RUN chown -R ${UID}:${GID} /dnode/
+
+# Set the user and source entrypoint in the user's .bashrc file
+USER ${USERNAME}
+RUN echo "source /r2_entrypoint.sh" >> /home/${USERNAME}/.bashrc
+
+RUN curl -fsSL https://install.julialang.org | sh -s -- -y --default-channel=1.10 -p=/home/${USERNAME}/.juliaup && \
+    chown -R ${UID}:${GID} /home/${USERNAME}/.juliaup
+
+# Precompile Julia files
+RUN /home/${USERNAME}/.juliaup/bin/julia -e \
+    'using Pkg; Pkg.develop(path="/dnode/src/SCRIBE"); Pkg.develop(path="/dnode/src/dNodeArch"); Pkg.instantiate();'
+
+ENTRYPOINT [ "/r2_entrypoint.sh" ]
+
+#########################################################
+### Dev Image for ROS2-based Distributed Architecture ###
+#########################################################
+FROM r2overlay AS r2dev
+
+ARG USERNAME=devuser
+
+USER root
+
+# Install extra tools for development
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gdb gdbserver vim
+
+USER ${USERNAME}
+
+# Set up the entrypoint
+COPY ${REL_DNODEJ_LOC}/docker/r2_entrypoint.sh /
+ENTRYPOINT [ "/r2_entrypoint.sh" ]
