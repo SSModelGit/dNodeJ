@@ -1,4 +1,4 @@
-# dNodeJ
+# dNodeArch
 
 The simple testing package for trialing distributed algorithms written in Julia. This specifically targets planning algorithms that need to simulate "multiple distributed agents connected according to an arbitrary network graph." This package specifically provides the backbone architecture for specifying:
 
