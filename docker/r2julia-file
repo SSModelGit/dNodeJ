@@ -113,10 +113,18 @@ ARG USERNAME=devuser
 USER root
 
 # Install extra tools for development
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gdb gdbserver vim
+RUN mkdir -p /var/run/sshd && chmod 0755 /var/run/sshd && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    gdb gdbserver vim openssh-server
+
+# Expose port 22 (standard TCP/IP port) for SSH connections
+EXPOSE 22
 
 USER ${USERNAME}
+# Prep for SSH
+RUN mkdir /home/${USERNAME}/.ssh
+COPY ${REL_DNODEJ_LOC}/docker/r2dockdev_ed25519.pub /home/${USERNAME}/.ssh/
+RUN cd /home/${USERNAME}/.ssh/ && echo "$(cat r2dockdev_ed25519.pub)" >> authorized_keys
 
 # Set up the entrypoint
 COPY ${REL_DNODEJ_LOC}/docker/r2_entrypoint.sh /

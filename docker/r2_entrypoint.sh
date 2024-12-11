@@ -7,7 +7,7 @@ echo "Sourced ROS 2 ${ROS_DISTRO}"
 
 if [ -f /dnode/install/setup.bash ]
 then
-    source /enterprise_ws/install/setup.bash
+    source /dnode/install/setup.bash
     echo "Sourced dNode API workspace"
 fi
 

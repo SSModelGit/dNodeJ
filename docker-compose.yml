@@ -46,6 +46,7 @@ services:
     tty: true
     ports:
       - "5000:5555"
+      - "2222:22"
     privileged: true
     environment:
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
@@ -60,7 +61,7 @@ services:
       # To do some easy container-to-container discussions (bad)
       - /dev/shm:/dev/shm:rw
     user: ${USERNAME:-devuser}
-    command: bash
+    command: sudo /usr/sbin/sshd -D
 
   colcon:
     extends: r2dev
