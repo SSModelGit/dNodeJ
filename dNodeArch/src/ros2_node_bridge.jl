@@ -29,25 +29,27 @@ end
 
 make_node(name::String, r2::R2Artifacts) = R2Node(r2.rclpy.create_node(name), Dict(), Dict())
 
-function add_publisher(node::R2Node, topic_name::String, msg_type::Any, queue_size::Integer)
-    if haskey(node.publishers, topic_name)
+function add_publisher(r2n::R2Node, topic_name::String, msg_type::Any, queue_size::Integer)
+    @unpack node = r2n
+    if haskey(r2n.publishers, topic_name)
         println("Attempting to add publisher that already exists")
         return false
     else
         println("Adding new publisher to topic: /", topic_name, " ...")
-        node.publishers[topic_name] = node.create_publisher(msg_type, topic_name, queue_size)
+        r2n.publishers[topic_name] = node.create_publisher(msg_type, topic_name, queue_size)
         println("success!") # TODO: check if publisher creation is actually successful
         return true
     end
 end
 
-function add_subscriber(node::R2Node, topic_name::String, callback::Function, msg_type::Any, frequency::Integer)
-    if haskey(node.subscribers, topic_name)
+function add_subscriber(r2n::R2Node, topic_name::String, callback::Function, msg_type::Any, frequency::Integer)
+    @unpack node = r2n
+    if haskey(r2n.subscribers, topic_name)
         println("Attempting to add subscriber that already exists")
         return false
     else
         println("Adding new subscriber on topic: /", topic_name, " ...")
-        node.subscribers[topic_name] = node.create_subscribtion(msg_type, topic_name, callback, frequency)
+        r2n.subscribers[topic_name] = node.create_subscribtion(msg_type, topic_name, callback, frequency)
         println("success!") # TODO: check if subscriber creation is actually successful
         return true
     end
