@@ -3,7 +3,7 @@ ARG ROS_DISTRO=humble
 
 FROM ros:${ROS_DISTRO} AS r2base
 
-ARG REL_DNODEJ_LOC=dNodeArch
+ARG REL_DNODEJ_LOC=dNodeJ
 
 ENV ROS_DISTRO=${ROS_DISTRO}
 SHELL ["/bin/bash", "-c"]
@@ -67,7 +67,7 @@ WORKDIR /dnode
 # Copy core files
 COPY ${REL_DNODEJ_LOC}/docker/r2_entrypoint.sh /
 COPY ${REL_SCRIBE_LOC} ./src/SCRIBE
-COPY ${REL_DNODEJ_LOC} ./src/dNodeArch
+COPY ${REL_DNODEJ_LOC} ./src/dNodeJ
 
 # Update environment variables for convenience
 ENV REL_SCRIBE_LOC=${REL_SCRIBE_LOC}
@@ -99,7 +99,7 @@ RUN curl -fsSL https://install.julialang.org | sh -s -- -y --default-channel=1.1
 
 # Precompile Julia files
 RUN /home/${USERNAME}/.juliaup/bin/julia -e \
-    'using Pkg; Pkg.develop(path="/dnode/src/SCRIBE"); Pkg.develop(path="/dnode/src/dNodeArch"); Pkg.instantiate();'
+    'using Pkg; Pkg.develop(path="/dnode/src/SCRIBE"); Pkg.develop(path="/dnode/src/dNodeJ/dNodeArch"); Pkg.instantiate();'
 
 ENTRYPOINT [ "/r2_entrypoint.sh" ]
 

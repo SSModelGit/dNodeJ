@@ -52,7 +52,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
     volumes:
       # Mount the source code
-      - ${BUILD_CONTEXT}/${REL_DNODEJ_LOC}:/dnode/src/dNodeArch:rw
+      - ${BUILD_CONTEXT}/${REL_DNODEJ_LOC}:/dnode/src/dNodeJ:rw
       - ${BUILD_CONTEXT}/${REL_SCRIBE_LOC}:/dnode/src/SCRIBE:rw
       # Mount colcon build artifacts for faster rebuilds
       - ${BUILD_CONTEXT}/${REL_DNODEJ_LOC}/.colcon/build/:/dnode/build/:rw

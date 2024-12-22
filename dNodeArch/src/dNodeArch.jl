@@ -12,4 +12,6 @@ function run_example(name::String)
     end
 end
 
+include("ros2_node_bridge.jl")
+
 end
