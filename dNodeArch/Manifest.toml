@@ -356,7 +356,7 @@ version = "0.5.1+0"
 
 [[deps.SCRIBE]]
 deps = ["Combinatorics", "GaussianDistributions", "Kalman", "LinearAlgebra", "Parameters", "Reexport", "Statistics"]
-path = "../SCRIBE"
+path = "../../SCRIBE"
 uuid = "9d033a4c-5281-4799-847b-6fce4a2de302"
 version = "1.0.0-DEV"
 
