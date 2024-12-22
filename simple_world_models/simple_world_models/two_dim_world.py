@@ -12,7 +12,7 @@ class MinimalService(Node):
 
     def state_req_callback(self, request, response):
         response.state = request.x + request.y
-        self.get_logger().info('Incoming request\nx: %d y: %d' % (request.x, request.y))
+        self.get_logger().info('Incoming request\nx: %f y: %f' % (request.x, request.y))
 
         return response
 

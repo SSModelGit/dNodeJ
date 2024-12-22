@@ -28,7 +28,7 @@ def main():
     rclpy.spin_until_future_complete(minimal_client, future)
     response = future.result()
     minimal_client.get_logger().info(
-        'Result of two_dim_world_state_req: for %d + %d = %d' %
+        'Result of two_dim_world_state_req: for %f + %f = %f' %
         (float(sys.argv[1]), float(sys.argv[2]), response.state))
 
     minimal_client.destroy_node()

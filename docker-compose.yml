@@ -66,3 +66,7 @@ services:
   colcon:
     extends: r2dev
     command: colcon build
+  
+  world2dserver:
+    extends: r2overlay
+    command: ros2 run simple_world_models service

@@ -8,11 +8,14 @@ struct R2Artifacts
     rclpy
     std_msgs
     geometry_msgs
+    custom_interfaces
 
-    R2Artifacts(rclpy, std_msgs, geometry_msgs) = new(rclpy, std_msgs, geometry_msgs)
+    R2Artifacts(rclpy, std_msgs, geometry_msgs, custom_interfaces) = new(rclpy, std_msgs, geometry_msgs, custom_interfaces)
 end
 
-connect_ros2_system() = R2Artifacts(pyimport("rclpy"), pyimport("std_msgs.msg"), pyimport("geometry_msgs.msg"))
+connect_ros2_system() = R2Artifacts(pyimport("rclpy"),
+                                    pyimport("std_msgs.msg"), pyimport("geometry_msgs.msg"),
+                                    Dict("ground_models"=>pyimport("ground_model_interfaces.srv")))
 
 init_ros(r2::R2Artifacts) = r2.rclpy.init()
 
@@ -58,3 +61,37 @@ function publish_std_string_msg(node::R2Node, r2::R2Artifacts, msg_content::Stri
 end
 
 retrieve_std_string_msg(msg) = msg.data
+
+struct R2ServiceInfo
+    name::String
+    srv_type::Any
+
+    R2ServiceInfo(name::String, srv_type::Any) = new(name, srv_type)
+end
+
+connect_ground_model(service_name::String, srv_type::String, r2::R2Artifacts) = R2ServiceInfo(service_name, r2.custom_interfaces["ground_models"][srv_type])
+
+function client_request(r2n::R2Node, srv_info::R2ServiceInfo, data::Dict, timeout::Float64, r2::R2Artifacts)
+    @unpack node = r2n
+    client = node.create_client(srv_info.srv_type, srv_info.name)
+
+    while !client.wait_for_service(timeout_sec=timeout)
+        println("Service not available, waiting...")
+    end
+
+    request = srv_info.srv_type.Request()
+    for (key, value) in data
+        if haskey(request, key)
+            request[key] = value
+        else
+            node.destroy_client(client)
+            return 500, "Data doesn't match service type - canceling client request"
+        end
+    end
+
+    future = client.call_async(request)
+    r2.rclpy.spin_until_future_complete(node, future)
+    reply = future.result()
+    node.destroy_client(client)
+    return reply
+end
