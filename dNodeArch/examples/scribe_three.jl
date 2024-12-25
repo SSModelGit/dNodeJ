@@ -1,12 +1,33 @@
-using dNodeArch
+using dNodeArch: request_r2_service
 using SCRIBE: SCRIBEObserverBehavior, SCRIBEObserverState, scribe_observations
+using Parameters: @unpack
 
 struct DataObserverBehavior <: SCRIBEObserverBehavior
     v_s::Dict{Symbol, Float64} # Scalar AWGN process impacting z - stored in dict
-    srv_name::String
+    srv_info::R2ServiceInfo
     agent_id::Integer
+    path::Matrix{Float64}
+    sensor_input::Array{Any}
 
-    DataObserverBehavior(σₛ::Float64=0.1, srv_name::String="/world_srv", agent_id::Integer=1) = new(Dict(:μ=>0,:σ=>σₛ), agent_id)
+    DataObserverBehavior(v_s::Dict{Symbol, Float64}, srv_info::R2ServiceInfo, agent_id::Integer, path::Matrix{Float64}, sensor_input::Array{Any}) = new(v_s, srv_info, agent_id, path, sensor_input)
+end
+
+basic_observer(σₛ::Float64=0.1, srv_info::R2ServiceInfo, agent_id::Integer, path_dims::Integer) = DataObserverBehavior(Dict(:μ=>0,:σ=>σₛ), srv_info, agent_id, Matrix{Float64}(undef, 0, path_dims), Any[])
+
+"""Not thread-safe!
+"""
+function get_observation(k::Integer, loc::Matrix{Float64}, o_b::DataObserverBehavior, r2n::R2Node, timeout::Float64, r2::R2Artifacts)
+    @unpack srv_info = o_b
+    data = Dict([("x"*string(i), x) for (i,x) in enumerate(loc)])
+    let response = request_r2_service(r2n, srv_info, data, timeout, r2)
+        if response[1] == 200
+            vcat(o_b.path, loc)
+            push!(o_b.sensor_input, (k, response[2]["state"]))
+            return 200
+        end
+        println("World unobservable...")
+        return 500
+    end
 end
 
 struct DataObserverState <: SCRIBEObserverState
@@ -26,7 +47,10 @@ end
 function scribe_observations(X::Matrix{Float64}, o_b::DataObserverBehavior)
     let nₛ=size(X,1), v_s=o_b.v_s, R=v_s[:σ]*I(nₛ)
         v=Dict(:R=>R, :k=>rand(Gaussian(zeros(nₛ), R)))
-        DataObserverState(k, nₛ, X, v, z)
+        k, sensor_in = [[p[i] for p in o_b.path] for i in 1:3]
+        @assert all(k.==mean(k))
+        z = sensor_in + v[:k]
+        DataObserverState(mean(k), nₛ, X, v, z)
     end
 end
 

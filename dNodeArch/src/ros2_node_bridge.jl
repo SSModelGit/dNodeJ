@@ -3,6 +3,7 @@ using Parameters: @unpack
 
 export R2Artifacts, connect_ros2_system, init_ros
 export R2Node, make_node, add_publisher, add_subscriber
+export R2ServiceInfo, connect_ground_model, request_r2_service
 
 struct R2Artifacts
     rclpy
@@ -73,7 +74,7 @@ end
 
 connect_ground_model(service_name::String, srv_type::String, r2::R2Artifacts) = R2ServiceInfo(service_name, r2.custom_interfaces["ground_models"][srv_type])
 
-function client_request(r2n::R2Node, srv_info::R2ServiceInfo, data::Dict, timeout::Float64, r2::R2Artifacts)
+function request_r2_service(r2n::R2Node, srv_info::R2ServiceInfo, data::Dict, timeout::Float64, r2::R2Artifacts)
     @unpack node = r2n
     client = node.create_client(srv_info.srv_type, srv_info.name)
 
@@ -95,5 +96,5 @@ function client_request(r2n::R2Node, srv_info::R2ServiceInfo, data::Dict, timeou
     r2.rclpy.spin_until_future_complete(node, future)
     reply = future.result()
     node.destroy_client(client)
-    return reply
+    return 200, reply
 end

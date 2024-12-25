@@ -15,8 +15,8 @@ class MinimalClientAsync(Node):
         self.req = TwoDimWorldScalarStateReq.Request()
 
     def send_request(self, x, y):
-        self.req.x = x
-        self.req.y = y
+        self.req.x1 = x
+        self.req.x2 = y
         return self.cli.call_async(self.req)
 
 
