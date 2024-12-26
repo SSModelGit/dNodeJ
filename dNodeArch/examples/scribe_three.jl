@@ -44,12 +44,16 @@ struct DataObserverState <: SCRIBEObserverState
     end
 end
 
+"""Not thread-safe!
+"""
 function scribe_observations(X::Matrix{Float64}, o_b::DataObserverBehavior)
     let nₛ=size(X,1), v_s=o_b.v_s, R=v_s[:σ]*I(nₛ)
         v=Dict(:R=>R, :k=>rand(Gaussian(zeros(nₛ), R)))
         k, sensor_in = [[p[i] for p in o_b.path] for i in 1:3]
         @assert all(k.==mean(k))
         z = sensor_in + v[:k]
+        empty!(o_b.path)
+        empty!(o_b.sensor_input)
         DataObserverState(mean(k), nₛ, X, v, z)
     end
 end
