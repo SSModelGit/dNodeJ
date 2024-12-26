@@ -8,7 +8,7 @@ The simple testing package for trialing distributed algorithms written in Julia.
 The current implementations provided use: `PyCall` in combination with `rclpy` from ROS2 (assuming that each node implementation is running in a Docker container). Future additions will also target native Julia implementations of network architectures, such as `RemoteChannel`.
 
 ## Structure
-
+```
 dNodeJ
 ├── dNodeArch
 │   ├── examples
@@ -23,6 +23,7 @@ dNodeJ
     ├── resource
     ├── simple_world_models
     └── test
+```
 
 Currently there are four components, centering around a ROS2 distributed architecture.
 
