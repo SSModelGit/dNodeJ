@@ -1,8 +1,8 @@
 using PyCall: pyimport
 using Parameters: @unpack
 
-export R2Artifacts, connect_ros2_system, init_ros
-export R2Node, make_node, add_publisher, add_subscriber
+export R2Artifacts, connect_ros2_system, init_ros, close_ros
+export R2Node, make_node, add_publisher, add_subscriber, publish_std_string_msg, retrieve_std_string_msg
 export R2ServiceInfo, connect_ground_model, request_r2_service
 
 struct R2Artifacts
@@ -19,6 +19,7 @@ connect_ros2_system() = R2Artifacts(pyimport("rclpy"),
                                     Dict("ground_models"=>pyimport("ground_model_interfaces.srv")))
 
 init_ros(r2::R2Artifacts) = r2.rclpy.init()
+close_ros(r2::R2Artifacts) = r2.rclpy.shutdown()
 
 struct R2Node
     node
@@ -50,7 +51,7 @@ function add_subscriber(r2n::R2Node, topic_name::String, callback::Function, msg
         return false
     else
         println("Adding new subscriber on topic: /", topic_name, " ...")
-        r2n.subscribers[topic_name] = node.create_subscribtion(msg_type, topic_name, callback, frequency)
+        r2n.subscribers[topic_name] = node.create_subscription(msg_type, topic_name, callback, frequency)
         println("success!") # TODO: check if subscriber creation is actually successful
         return true
     end
@@ -63,7 +64,7 @@ function publish_std_string_msg(node::R2Node, r2::R2Artifacts, msg_content::Stri
     node.publishers[topic].publish(msg)
 end
 
-retrieve_std_string_msg(msg) = msg.data
+retrieve_std_string_msg(msg) = string(msg.data)
 
 struct R2ServiceInfo
     name::String
