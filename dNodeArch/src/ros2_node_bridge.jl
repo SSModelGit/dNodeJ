@@ -1,8 +1,9 @@
 using PyCall: pyimport
 using Parameters: @unpack
+using JSON: parse
 
 export R2Artifacts, connect_ros2_system, init_ros, close_ros
-export R2Node, make_node, add_publisher, add_subscriber, publish_std_string_msg, retrieve_std_string_msg
+export R2Node, make_node, add_publisher, add_subscriber, remove_subscriber, publish_msg, publish_std_string_msg, retrieve_std_string_json
 export R2ServiceInfo, connect_ground_model, request_r2_service
 
 struct R2Artifacts
@@ -57,14 +58,34 @@ function add_subscriber(r2n::R2Node, topic_name::String, callback::Function, msg
     end
 end
 
-function publish_std_string_msg(node::R2Node, r2::R2Artifacts, msg_content::String, topic::String)
-    msg = r2.std_msgs.String()
-    msg.data = msg_content
-    println("Publishing: ", msg.data)
-    node.publishers[topic].publish(msg)
+remove_subscriber(r2n::R2Node, topic_name::String) = pop!(r2n.subscribers, topic_name).destroy()
+
+"""More generic publish function.
+"""
+function publish_msg(r2n::R2Node, data::Dict, topic::String)
+    let pub = r2n.publishers[topic], msg = pub.msg_type()
+        for (key, value) in data
+            if haskey(msg, key)
+                msg[key] = value
+            else
+                println("Sorry, provided data does not match publisher type: ", pub.msg_type)
+                return 500
+            end
+        end
+        println("Publishing: ", msg.data)
+        pub.publish(msg)
+    end
 end
 
-retrieve_std_string_msg(msg) = string(msg.data)
+function publish_std_string_msg(r2n::R2Node, data::Dict, topic::String)
+    let pub = r2n.publishers[topic], msg = pub.msg_type()
+        msg.data = json(data)
+        println("Publishing: ", msg.data)
+        pub.publish(msg)
+    end
+end
+
+retrieve_std_string_json(msg) = JSON.parse(string(msg.data))
 
 struct R2ServiceInfo
     name::String

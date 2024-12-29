@@ -14,10 +14,10 @@ mutable struct R2SCRIBEAgent
     R2SCRIBEAgent(r2::R2Artifacts, r2n::R2Node, sagent::Union{SCRIBEAgent, Nothing}) = new(r2, r2n, sagent)
 end
 
-function init_r2_agent(agent_id::Integer=1)
+function init_r2_agent(agent_tag::String="agent1")
     let r2 = connect_ros2_system()
         init_ros(r2)
-        R2SCRIBEAgent(r2, make_node("agent"*string(agent_id), r2), nothing)
+        R2SCRIBEAgent(r2, make_node(agent_tag, r2), nothing)
     end
 end
 
@@ -62,6 +62,14 @@ function get_observation(loc::Matrix{Float64}, agent::R2SCRIBEAgent, observer::D
     end
 end
 
+mat_row(w::Integer, X::Matrix) = reshape(X[w, :], 1, size(X, 2))
+
+function get_n_observations(;X::Matrix{Float64}, agent::R2SCRIBEAgent, observer::DataObserverBehavior, world::DataServerWorld, timeout::Float64=1.0)
+    for i in 1:size(X,1)
+        get_observation(mat_row(i,X), agent, observer, world; timeout=timeout)
+    end
+end
+
 struct DataObserverState <: SCRIBEObserverState
     k::Integer
     nₛ::Integer
@@ -103,8 +111,10 @@ function dist_agent_setup(id::Integer, init_loc::Matrix{Float64}, num_samplesᵢ
     init_agent_loc=vcat(zeros(nᵩ)', init_loc)
 
     # Gather observations along random walk to provide early prior
-    [get_observation(init_loc+rand(1,2), r2a, observer, world) for _ in 1:num_samplesᵢ]
-    init_agent_loc = world.path[observer.obs_info[:k]]
+    init_agent_loc = vcat(init_loc, init_loc.+rand(num_samplesᵢ-1, size(init_loc,2)))
+    get_n_observations(; X=init_agent_loc, agent=r2a, observer=observer, world=world, timeout=1.0)
+    # [get_observation(init_loc+rand(1,2), r2a, observer, world) for _ in 1:num_samplesᵢ]
+    # init_agent_loc = world.path[observer.obs_info[:k]]
 
     # Initialize estimation system and dist learning agent
     lg_Fs = initialize_KF(ag_params, observer, copy(init_agent_loc), world)
@@ -112,24 +122,77 @@ function dist_agent_setup(id::Integer, init_loc::Matrix{Float64}, num_samplesᵢ
     return world, initialize_agent(lg_Fs) 
 end
 
-function dist_exploration(agent_id=1; tₘ=1000)
-    agent_node = init_r2_agent(agent_id)
-    try
-        world, agent_node.sagent = dist_agent_setup(agent_id, [0. 0.], 5, agent_node)
-        return world, agent_node
-    finally
-        close_ros(agent_node.r2)
+"""Callback function for updating an agent's network map.
+"""
+function update_network_map(r2data::Any, ag_tag::String, netmap::Dict)
+    let new_map=retrieve_std_string_json(r2data)
+        for k in keys(netmap)
+            netmap[k] = new_map[ag_tag][k]
+        end
     end
 end
 
-function test_subscribing()
-    agent_node = init_r2_agent(1)
-    subber = add_subscriber(agent_node.r2n, "/chatter", x->println(retrieve_std_string_msg(x)), agent_node.r2.std_msgs["String"], 1)
+"""General callback to store updates from other agents.
+"""
+store_update(r2data::Any, storage::Dict, ext_ag::String) = push!(storage[ext_ag], retrieve_std_string_json(r2data))
+
+"""Helper function to add all necessary subscribers for a given agent.
+"""
+function listen_to_agent(ext_ag::String, covi_store::Dict, mhmc_store::Dict, anode::R2SCRIBEAgent)
+    @unpack r2, r2n = anode
+    add_subscriber(r2n, "/"*ext_ag*"/covi", x->store_update(x, covi_store, ext_ag), r2.std_msgs.String, 1)
+    add_subscriber(r2n, "/"*ext_ag*"/mhmc", x->store_update(x, mhmc_store, ext_ag), r2.std_msgs.String, 1)
+end
+
+"""Helper function to destroy all subscribers associated with a given agent.
+"""
+function stop_listening_to_agent(anode::R2SCRIBEAgent, ext_ag::String)
+    @unpack r2n = anode
+    remove_subscriber(r2n, "/"*ext_ag*"/covi")
+    remove_subscriber(r2n, "/"*ext_ag*"/mhmc")
+end
+
+function dist_exploration(agent_id=1;nₐ=3, tₘ=1000)
+    agent_tag = "agent"*string(agent_id)
+    agent_node = init_r2_agent(agent_tag)
+    agent_connections = Dict{String, Bool}([("agent"*string(i), false) for i in 1:nₐ if "agent"*string(i)≠agent_tag])
+
+    # Consensus data for Cov. Int. and MHMC
+    covi_cdata = Dict(String, Array)([(ext_tag, Dict[]) for ext_tag in keys(agent_connections)])
+    mhmc_cdata = Dict(String, Array)([(ext_tag, Dict[]) for ext_tag in keys(agent_connections)])
+
     try
-        while agent_node.r2.rclpy.ok()
-            agent_node.r2.rclpy.spin_once(agent_node.r2n.node)
+        world, agent_node.sagent = dist_agent_setup(agent_id, [0. 0.], 5, agent_node)
+
+        # Start listening to Network Mapper
+        add_subscriber(agent_node.r2n, "/network_map", x->update_network_map(x, agent_tag, agent_connections), agent_node.r2.std_msgs.String, 1)
+        agent_node.r2.rclpy.spin_once(agent_node.r2n.node) # Get the first network map upates
+
+        # Add agent publishers
+        add_publisher(agent_node.r2n, "/"*agent_tag*"/covi", agent_node.r2.std_msgs.String, 10)
+        add_publisher(agent_node.r2n, "/"*agent_tag*"/mhmc", agent_node.r2.std_msgs.String, 10)
+
+        while true
+            # Add subscribers to other agents based on connection networks
+            for (ext_ag, connectedQ) in agent_connections;
+                if connectedQ listen_to_agent(ext_ag, covi_cdata, mhmc_cdata, agent_node) end
+            end
+
+            return world, agent_node
         end
     finally
         close_ros(agent_node.r2)
     end
 end
+
+# function test_subscribing()
+#     agent_node = init_r2_agent(1)
+#     subber = add_subscriber(agent_node.r2n, "/chatter", x->println(retrieve_std_string_json(x)), agent_node.r2.std_msgs["String"], 1)
+#     try
+#         while agent_node.r2.rclpy.ok()
+#             agent_node.r2.rclpy.spin_once(agent_node.r2n.node)
+#         end
+#     finally
+#         close_ros(agent_node.r2)
+#     end
+# end
