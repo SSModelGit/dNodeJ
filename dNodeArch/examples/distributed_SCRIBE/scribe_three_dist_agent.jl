@@ -62,8 +62,12 @@ function get_observation(loc::Matrix{Float64}, agent::R2SCRIBEAgent, observer::D
     end
 end
 
+"""Ensures that the matrix index slice is also of type Matrix.
+"""
 mat_row(w::Integer, X::Matrix) = reshape(X[w, :], 1, size(X, 2))
 
+"""Convenience function to loop through all locations specified in X.
+"""
 function get_n_observations(;X::Matrix{Float64}, agent::R2SCRIBEAgent, observer::DataObserverBehavior, world::DataServerWorld, timeout::Float64=1.0)
     for i in 1:size(X,1)
         get_observation(mat_row(i,X), agent, observer, world; timeout=timeout)
@@ -152,8 +156,17 @@ function stop_listening_to_agent(anode::R2SCRIBEAgent, ext_ag::String)
     remove_subscriber(r2n, "/"*ext_ag*"/mhmc")
 end
 
-function dist_exploration(agent_id=1;nₐ=3, tₘ=1000)
+function wpt_following_observer(;Xₖ::Matrix{Float64}, wpt::Matrix{Float64}, nₛ::Integer,
+                                 agent::R2SCRIBEAgent, observer::DataObserverBehavior, world::DataServerWorld, timeout::Float64=1.0)
+    get_n_observations(;X=hcat(range(start=Xₖ[1],stop=wpt[1],length=nₛ), range(start=Xₖ[2],stop=wpt[2],length=nₛ)),
+                        agent=agent, observer=observer, world=world, timeout=timeout)
+end
+
+function dist_exploration(agent_id=1;nₐ=3, tₘ=1000; param_file="agent_params.json")
     agent_tag = "agent"*string(agent_id)
+    agent_params = parse(read(param_file, String))
+    wpts = agent_params[agent_tag]["locs"]["wpts"]
+    X₀=agent_params[agent_tag]["locs"]["x0"]
     agent_node = init_r2_agent(agent_tag)
     agent_connections = Dict{String, Bool}([("agent"*string(i), false) for i in 1:nₐ if "agent"*string(i)≠agent_tag])
 
@@ -183,6 +196,13 @@ function dist_exploration(agent_id=1;nₐ=3, tₘ=1000)
     finally
         close_ros(agent_node.r2)
     end
+end
+
+if length(ARGS) < 1
+    println("No agent ID provided!")
+else
+    agent_id = ARGS[1]
+    println("Agent ID: ", agent_id)
 end
 
 # function test_subscribing()

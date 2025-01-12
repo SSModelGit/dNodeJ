@@ -1,0 +1,20 @@
+services:
+  scribe-1:
+    extends:
+      file: ../../../docker-compose.yml
+      service: r2overlay
+    command: julia -e 'include("/dnode/src/dNodeJ/dNodeArch/examples/distributed_SCRIBE/scribe_three_dist_agent.jl")'
+  scribe-2:
+    extends:
+      file: ../../../docker-compose.yml
+      service: r2overlay
+  scribe-3:
+    extends:
+      file: ../../../docker-compose.yml
+      service: r2overlay
+
+  world2dserver:
+    extends:
+      file: ../../../docker-compose.yml
+      service: world2dserver
+  
